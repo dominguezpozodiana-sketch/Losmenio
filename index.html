@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi Lista de Tareas</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#3f51b5" />
+</head>
+<body>
+  <div id="app">
+    <header><h1>📋 Mis Tareas</h1></header>
+    <main>
+      <div class="input-area">
+        <input type="text" id="taskInput" placeholder="Escribe una nueva tarea..." />
+        <button id="addBtn">Agregar</button>
+      </div>
+      <ul id="taskList"></ul>
+    </main>
+    <footer><p>Tareas pendientes: <span id="pendingCount">0</span></p></footer>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // Registro del Service Worker con mensajes de depuración
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => {
+          console.log('✅ SW registrado correctamente', reg);
+        })
+        .catch(err => {
+          console.error('❌ Error al registrar SW:', err);
+        });
+    } else {
+      console.warn('⚠️ Service Worker no soportado en este navegador.');
+    }
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt , (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const btn = document.createElement('button');
+        btn.textContent = '📲 Instalar App';
+        btn.style.cssText = `
+          position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+          background: #3f51b5; color: white; border: none; padding: 14px 28px;
+          border-radius: 40px; font-size: 18px; font-weight: bold; z-index: 9999;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer;
+        `;
+        btn.onclick = async () => {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(outcome === 'accepted' ? '✅ Instalada' : '❌ Cancelada');
+          deferredPrompt = null;
+          btn.remove();
+        };
+        document.body.appendChild(btn);
+      });
+  </script>
+</body>
+</html>
