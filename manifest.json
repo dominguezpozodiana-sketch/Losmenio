@@ -2,7 +2,7 @@
   "name": "Mi Lista de Tareas",
   "short_name": "MiLista",
   "description": "Una simple lista de tareas PWA",
-  "start_url": "/",
+  "start_url": "./"   // o "/repo/" si prefieres absoluta
   "display": "standalone",
   "background_color": "#f5f5f5",
   "theme_color": "#4CAF50",
