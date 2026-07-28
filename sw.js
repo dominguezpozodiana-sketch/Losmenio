@@ -1,26 +1,21 @@
-const CACHE_NAME = 'tcp-gestor-v2'; // Cambia el nombre para forzar actualización
-const urlsToCache = [
+const CACHE_NAME = 'tcp-gestor-v4';
+const LOCAL_ASSETS = [
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png',
-  'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
-  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-  'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  './icon-512.png'
 ];
 
-// Instalación: descarga y guarda en caché todos los recursos
+// Instalación: solo recursos locales
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+      .then(cache => cache.addAll(LOCAL_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activación: limpia cachés antiguas
+// Activación: limpieza de cachés antiguas
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -35,14 +30,38 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Estrategia: caché primero (cache-first), luego red
+// Fetch: caché primero para todo, pero con manejo de errores
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-      .catch(() => {
-        // Si falla todo, devuelve una página offline (opcional)
-        return caches.match('./index.html');
+  const request = event.request;
+  const url = new URL(request.url);
+
+  // Para recursos de CDN, intenta caché, si no, red y guarda en caché después
+  if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'cdnjs.cloudflare.com') {
+    event.respondWith(
+      caches.match(request).then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
+        // Si no está en caché, descarga y guarda
+        return fetch(request).then(response => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseClone);
+          });
+          return response;
+        }).catch(() => {
+          // Si falla la red, devuelve algo (ej. un mensaje offline)
+          return new Response('Recurso no disponible offline', { status: 404 });
+        });
       })
-  );
+    );
+  } else {
+    // Para recursos locales, estrategia caché primero con fallback a red
+    event.respondWith(
+      caches.match(request).then(cachedResponse => {
+        return cachedResponse || fetch(request).catch(() => {
+          // Fallback a index.html para SPA
+          return caches.match('./index.html');
+        });
+      })
+    );
+  }
 });
