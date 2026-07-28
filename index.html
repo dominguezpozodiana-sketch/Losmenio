@@ -1,71 +1,2159 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi PWA en GitHub Pages</title>
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#317EFB">
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 2rem; background: #f0f4f8; color: #1a202c; }
-    h1 { color: #2b6cb0; }
-    .card { background: white; border-radius: 12px; padding: 2rem; max-width: 400px; margin: 2rem auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    button { background: #2b6cb0; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem; cursor: pointer; }
-    button:hover { background: #1a4f8b; }
-    .status { margin-top: 1rem; color: #38a169; }
-    .debug { font-size: 0.8rem; color: #718096; }
-  </style>
-</head>
-<body>
-  <h1>🚀 App Instalable</h1>
-  <div class="card">
-    <p>Esta app se puede instalar desde Chrome.</p>
-    <button id="installBtn">Instalar App</button>
-    <p id="status" class="status"></p>
-    <p id="debug" class="debug"></p>
-  </div>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TCP Gestor Pro - Cuba</title>
+    <!-- MANIFESTO (ruta relativa) -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0d47a1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <script>
-    // Registro del Service Worker con ruta relativa
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
+    <!-- CDNs -->
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* ===== ESTILOS COMPLETOS ===== */
+        :root {
+            --primary: #0d47a1;
+            --primary-light: #1565c0;
+            --primary-dark: #0a2a6e;
+            --bg: #f4f6f8;
+            --surface: #ffffff;
+            --text: #1a1a2e;
+            --text-muted: #64748b;
+            --border: #d0d7de;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --radius: 12px;
+            --success: #2e7d32;
+            --danger: #c62828;
+            --warning: #f9a825;
+        }
+        [data-theme="dark"] {
+            --bg: #121212;
+            --surface: #1e1e2e;
+            --text: #e4e4e4;
+            --text-muted: #94a3b8;
+            --border: #444;
+            --shadow: 0 4px 12px rgba(0,0,0,0.6);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,sans-serif; }
+        body { background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+        .app { max-width:1200px; margin:0 auto; display:flex; min-height:100vh; }
+        #sidebar {
+            width:260px; background:var(--primary-dark); color:#fff; display:flex; flex-direction:column;
+            position:fixed; height:100vh; z-index:100; transition:transform 0.3s;
+        }
+        #sidebar.closed { transform:translateX(-260px); }
+        .sidebar-header { padding:20px; font-size:1.2rem; font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; }
+        .sidebar-menu { list-style:none; padding:15px 10px; flex-grow:1; overflow-y:auto; }
+        .sidebar-menu li { margin-bottom:5px; }
+        .sidebar-menu a { display:flex; align-items:center; gap:12px; padding:12px 15px; color:#b0bec5; text-decoration:none; border-radius:8px; transition:0.2s; cursor:pointer; }
+        .sidebar-menu a:hover, .sidebar-menu a.active { background:var(--primary); color:#fff; }
+        #main-content { flex-grow:1; margin-left:260px; display:flex; flex-direction:column; min-height:100vh; }
+        #main-content.expanded { margin-left:0; }
+        header { background:var(--surface); padding:15px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:90; }
+        .header-left, .header-right { display:flex; align-items:center; gap:15px; }
+        .btn-icon { background:none; border:none; color:var(--text); font-size:1.2rem; cursor:pointer; padding:5px; border-radius:4px; }
+        .btn-icon:hover { background:var(--border); }
+        main { padding:20px; flex-grow:1; }
+        .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:20px; box-shadow:var(--shadow); }
+        .grid-dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:15px; margin-bottom:20px; }
+        .kpi-card { text-align:center; }
+        .kpi-title { font-size:0.85rem; color:var(--text-muted); }
+        .kpi-value { font-size:1.8rem; font-weight:bold; color:var(--primary); }
+        .btn { background:var(--primary); color:#fff; border:none; padding:10px 16px; border-radius:8px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:0.2s; }
+        .btn:hover { opacity:0.85; }
+        .btn-success { background:var(--success); }
+        .btn-danger { background:var(--danger); }
+        .btn-warning { background:var(--warning); color:#1a1a2e; }
+        .btn-sm { padding:6px 12px; font-size:0.85rem; }
+        input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); }
+        .form-group { margin-bottom:15px; }
+        label { font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px; }
+        table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+        th, td { padding:10px 8px; text-align:left; border-bottom:1px solid var(--border); }
+        th { background:var(--bg); font-weight:600; }
+        .badge { padding:3px 10px; border-radius:20px; font-size:0.7rem; background:var(--primary); color:#fff; }
+        .badge-success { background:var(--success); }
+        .badge-danger { background:var(--danger); }
+        .badge-warning { background:var(--warning); color:#1a1a2e; }
+        .view-section { display:none; }
+        .view-section.active { display:block; }
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:1000; }
+        .modal.open { display:flex; }
+        .modal-content { background:var(--surface); border-radius:var(--radius); padding:25px; width:90%; max-width:600px; max-height:90vh; overflow-y:auto; }
+        .toast-container { position:fixed; top:70px; right:20px; z-index:2000; display:flex; flex-direction:column; gap:8px; }
+        .toast { background:var(--surface); color:var(--text); padding:12px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); border-left:5px solid var(--primary); animation:slideIn 0.3s; }
+        .toast.error { border-left-color:var(--danger); }
+        .toast.success { border-left-color:var(--success); }
+        @keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+        .spinner { border:4px solid var(--border); border-top-color:var(--primary); border-radius:50%; width:36px; height:36px; animation:spin 0.8s linear infinite; margin:20px auto; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .loading-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center; }
+        .loading-overlay.active { display:flex; }
+        .pagination { display:flex; gap:8px; justify-content:center; margin-top:15px; flex-wrap:wrap; }
+        .pagination button { background:var(--bg); border:1px solid var(--border); padding:6px 12px; border-radius:6px; cursor:pointer; color:var(--text); }
+        .pagination button.active { background:var(--primary); color:#fff; }
+        .pagination button:disabled { opacity:0.5; cursor:default; }
+        #pos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-top:15px; max-height:400px; overflow-y:auto; }
+        .pos-item { background:var(--bg); padding:10px; border-radius:8px; cursor:pointer; text-align:center; transition:0.2s; }
+        .pos-item:hover { transform:scale(1.02); background:var(--border); }
+        .pos-item img { max-width:100%; height:60px; object-fit:contain; }
+        .cart-item { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); }
+        .purchase-item { border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:10px; }
+        @media (max-width:768px) {
+            #sidebar { transform:translateX(-260px); }
+            #sidebar.mobile-open { transform:translateX(0); }
+            #main-content { margin-left:0 !important; }
+            .grid-dashboard { grid-template-columns:1fr 1fr; }
+        }
+        @media (max-width:480px) { .grid-dashboard { grid-template-columns:1fr; } }
+        #install-status { font-size:0.8rem; color:var(--text-muted); margin-left:10px; }
+    </style>
+</head>
+<body data-theme="light">
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<div class="app">
+    <!-- SIDEBAR -->
+    <nav id="sidebar">
+        <div class="sidebar-header"><span>TCP Gestor Pro</span><i class="fas fa-store"></i></div>
+        <ul class="sidebar-menu">
+            <li><a href="#" data-view="dashboard" class="active"><i class="fas fa-chart-pie"></i> Dashboard</a></li>
+            <li><a href="#" data-view="pos"><i class="fas fa-cash-register"></i> Punto de Venta</a></li>
+            <li><a href="#" data-view="inventory"><i class="fas fa-boxes"></i> Inventario</a></li>
+            <li><a href="#" data-view="purchases"><i class="fas fa-truck-loading"></i> Compras</a></li>
+            <li><a href="#" data-view="finances"><i class="fas fa-wallet"></i> Finanzas</a></li>
+            <li><a href="#" data-view="crm"><i class="fas fa-users"></i> Clientes</a></li>
+            <li><a href="#" data-view="hr"><i class="fas fa-user-tie"></i> RRHH</a></li>
+            <li><a href="#" data-view="settings"><i class="fas fa-cogs"></i> Configuración</a></li>
+        </ul>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <div id="main-content">
+        <header>
+            <div class="header-left">
+                <button class="btn-icon" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h3 id="view-title">Dashboard</h3>
+                <span id="install-status"><i class="fas fa-cloud"></i></span>
+            </div>
+            <div class="header-right">
+                <span id="sync-status"><i class="fas fa-cloud"></i></span>
+                <button class="btn-icon" onclick="toggleTheme()"><i class="fas fa-moon" id="theme-icon"></i></button>
+                <button class="btn-icon" onclick="logout()" title="Cerrar sesión"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </header>
+        <main>
+            <!-- DASHBOARD -->
+            <section id="view-dashboard" class="view-section active">
+                <div class="grid-dashboard">
+                    <div class="card kpi-card"><span class="kpi-title">Ventas Hoy</span><span class="kpi-value" id="kpi-sales-today">0.00</span></div>
+                    <div class="card kpi-card"><span class="kpi-title">Ingresos Mes</span><span class="kpi-value" id="kpi-income-month">0.00</span></div>
+                    <div class="card kpi-card"><span class="kpi-title">Stock Bajo</span><span class="kpi-value" id="kpi-low-stock">0</span></div>
+                    <div class="card kpi-card"><span class="kpi-title">Impuesto Estimado</span><span class="kpi-value" id="kpi-tax">0.00</span></div>
+                </div>
+                <div class="card"><h3>Ventas 7 Días</h3><div style="height:250px;"><canvas id="salesChart"></canvas></div></div>
+                <div class="card"><h3>Alertas</h3><div id="alerts-container"></div></div>
+            </section>
+
+            <!-- POS -->
+            <section id="view-pos" class="view-section">
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+                    <div class="card">
+                        <h3>Productos</h3>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="pos-search" placeholder="Buscar..." oninput="filterPOS()">
+                            <button class="btn" onclick="startScanner()"><i class="fas fa-camera"></i></button>
+                        </div>
+                        <div id="pos-grid"></div>
+                    </div>
+                    <div class="card">
+                        <h3>Carrito</h3>
+                        <div id="pos-cart" style="max-height:250px; overflow-y:auto;"></div>
+                        <div style="border-top:1px solid var(--border); padding-top:15px; margin-top:15px;">
+                            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2rem;">
+                                <span>Subtotal:</span><span id="pos-subtotal">0.00 CUP</span>
+                            </div>
+                            <div class="form-group"><label>Descuento (%)</label><input type="number" id="pos-discount" value="0" min="0" max="100" oninput="updateCartTotals()"></div>
+                            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2rem;">
+                                <span>Total:</span><span id="pos-total">0.00 CUP</span>
+                            </div>
+                            <div class="form-group"><label>Moneda</label>
+                                <select id="pos-currency"><option value="CUP">CUP</option><option value="USD">USD</option></select>
+                            </div>
+                            <div class="form-group"><label>Métodos de Pago</label>
+                                <div id="pos-payments">
+                                    <div style="display:flex; gap:10px; align-items:center;">
+                                        <select class="payment-method" style="flex:2;">
+                                            <option value="efectivo">Efectivo</option>
+                                            <option value="transfermovil">Transfermóvil</option>
+                                            <option value="tarjeta">Tarjeta</option>
+                                            <option value="credito">Cuenta Corriente</option>
+                                        </select>
+                                        <input type="number" class="payment-amount" placeholder="Monto" style="flex:1;">
+                                        <button class="btn btn-success btn-sm" onclick="addPaymentMethod()"><i class="fas fa-plus"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group"><label>Cliente (opcional)</label>
+                                <select id="pos-client"><option value="">Sin cliente</option></select>
+                            </div>
+                            <button class="btn btn-success" style="width:100%;" onclick="checkout()">Vender</button>
+                            <button class="btn btn-danger" style="width:100%; margin-top:5px;" onclick="clearCart()">Vaciar</button>
+                            <button class="btn btn-warning" style="width:100%; margin-top:5px;" onclick="createOrder()">Crear Pedido</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card"><h3>Pedidos Activos</h3><div id="orders-list"></div></div>
+            </section>
+
+            <!-- INVENTARIO -->
+            <section id="view-inventory" class="view-section">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <h3>Productos</h3>
+                        <div>
+                            <button class="btn" onclick="openProductModal()"><i class="fas fa-plus"></i> Nuevo</button>
+                            <button class="btn" onclick="exportExcel()"><i class="fas fa-file-excel"></i> Exportar</button>
+                            <button class="btn" onclick="document.getElementById('import-excel').click()"><i class="fas fa-file-import"></i> Importar</button>
+                            <input type="file" id="import-excel" accept=".xlsx,.csv" style="display:none" onchange="importExcel(event)">
+                        </div>
+                    </div>
+                    <div style="overflow-x:auto; margin-top:15px;">
+                        <table><thead><tr><th>SKU</th><th>Nombre</th><th>Categoría</th><th>Stock</th><th>Precio CUP</th><th>Acciones</th></tr></thead>
+                        <tbody id="inventory-tbody"></tbody></table>
+                    </div>
+                    <div class="pagination" id="inventory-pagination"></div>
+                </div>
+            </section>
+
+            <!-- COMPRAS -->
+            <section id="view-purchases" class="view-section">
+                <div class="card">
+                    <h3>Registro de Compras</h3>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button class="btn" onclick="openPurchaseModal()"><i class="fas fa-plus"></i> Nueva Compra</button>
+                        <button class="btn btn-success" onclick="openElaborationModal()"><i class="fas fa-industry"></i> Nuevo Elaborado</button>
+                    </div>
+                    <div id="purchases-list" style="margin-top:15px;"></div>
+                </div>
+            </section>
+
+            <!-- FINANZAS -->
+            <section id="view-finances" class="view-section">
+                <div class="grid-dashboard">
+                    <div class="card kpi-card"><span class="kpi-title">Ingresos</span><span class="kpi-value" id="fin-income">0.00</span></div>
+                    <div class="card kpi-card"><span class="kpi-title">Gastos</span><span class="kpi-value" id="fin-expenses">0.00</span></div>
+                    <div class="card kpi-card"><span class="kpi-title">Ganancia Neta</span><span class="kpi-value" id="fin-profit">0.00</span></div>
+                    <div class="card kpi-card"><span class="kpi-title">Impuesto ONAT</span><span class="kpi-value" id="fin-tax">0.00</span></div>
+                </div>
+                <div class="card">
+                    <h3>Movimientos</h3>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <input type="text" id="mov-desc" placeholder="Descripción" style="flex:2;">
+                        <input type="number" id="mov-amount" placeholder="Monto" style="flex:1;" min="0.01" step="0.01">
+                        <select id="mov-type" style="flex:1;"><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option></select>
+                        <select id="mov-category" style="flex:1;">
+                            <option value="Ventas">Ventas</option>
+                            <option value="Compras">Compras</option>
+                            <option value="Servicios">Servicios</option>
+                            <option value="Nómina">Nómina</option>
+                            <option value="Alquiler">Alquiler</option>
+                            <option value="Impuestos">Impuestos</option>
+                            <option value="Producción">Producción</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                        <button class="btn" onclick="addMovement()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="movements-list" style="max-height:300px; overflow-y:auto; margin-top:15px;"></div>
+                </div>
+                <div class="card">
+                    <h3>Declaración ONAT</h3>
+                    <button class="btn" onclick="generateDJ08()"><i class="fas fa-file-pdf"></i> Generar DJ-08 (PDF)</button>
+                    <button class="btn" onclick="generateInvoice()"><i class="fas fa-file-invoice"></i> Factura Electrónica</button>
+                    <button class="btn" onclick="viewInvoices()"><i class="fas fa-list"></i> Ver Facturas</button>
+                </div>
+            </section>
+
+            <!-- CRM -->
+            <section id="view-crm" class="view-section">
+                <div class="card">
+                    <h3>Clientes y Proveedores</h3>
+                    <button class="btn" onclick="openClientModal()"><i class="fas fa-user-plus"></i> Nuevo Cliente</button>
+                    <button class="btn" onclick="openClientModal(null, 'proveedor')"><i class="fas fa-truck"></i> Nuevo Proveedor</button>
+                    <div id="crm-list" style="margin-top:15px;"></div>
+                </div>
+            </section>
+
+            <!-- RRHH -->
+            <section id="view-hr" class="view-section">
+                <div class="card">
+                    <h3>Recursos Humanos</h3>
+                    <button class="btn" onclick="openEmployeeModal()"><i class="fas fa-user-plus"></i> Nuevo Empleado</button>
+                    <div id="hr-list" style="margin-top:15px;"></div>
+                </div>
+                <div class="card">
+                    <h3>Asistencia</h3>
+                    <button class="btn" onclick="registerAttendance()"><i class="fas fa-clock"></i> Registrar Entrada/Salida</button>
+                    <div id="attendance-list" style="margin-top:15px;"></div>
+                </div>
+                <div class="card">
+                    <h3>Nómina</h3>
+                    <button class="btn" onclick="calculatePayroll()"><i class="fas fa-calculator"></i> Calcular Nómina</button>
+                    <div id="payroll-result" style="margin-top:15px;"></div>
+                </div>
+            </section>
+
+            <!-- CONFIGURACIÓN -->
+            <section id="view-settings" class="view-section">
+                <div class="card">
+                    <h3>Configuración General</h3>
+                    <div class="form-group"><label>Nombre de la Empresa</label><input type="text" id="company-name" value="Mi TCP"></div>
+                    <div class="form-group"><label>NIT</label><input type="text" id="company-nit" value=""></div>
+                    <div class="form-group"><label>Dirección</label><input type="text" id="company-address" value=""></div>
+                    <div class="form-group"><label>Régimen Fiscal</label><select id="tax-regime"><option value="general">General</option><option value="simplificado">Simplificado</option></select></div>
+                    <div class="form-group"><label>Tasa de cambio CUP/USD</label><input type="number" id="exchange-rate" step="any" value="24"></div>
+                    <button class="btn" onclick="saveSettings()">Guardar Configuración</button>
+                </div>
+                <div class="card">
+                    <h3>Seguridad y Respaldo</h3>
+                    <button class="btn" onclick="exportBackup()"><i class="fas fa-download"></i> Respaldo JSON</button>
+                    <button class="btn" onclick="document.getElementById('import-backup').click()"><i class="fas fa-upload"></i> Restaurar Respaldo</button>
+                    <input type="file" id="import-backup" accept=".json" style="display:none" onchange="importBackupFile(event)">
+                    <button class="btn btn-danger" onclick="resetDB()"><i class="fas fa-trash"></i> Reiniciar Datos</button>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<!-- ===== MODALES COMPLETOS ===== -->
+<!-- Producto -->
+<div class="modal" id="product-modal">
+    <div class="modal-content">
+        <h3 id="product-modal-title">Nuevo Producto</h3>
+        <form id="product-form" onsubmit="saveProduct(event)">
+            <input type="hidden" id="product-id">
+            <div class="form-group"><label>Nombre *</label><input type="text" id="p-name" required></div>
+            <div class="form-group"><label>SKU *</label><input type="text" id="p-sku" required></div>
+            <div class="form-group"><label>Categoría</label><input type="text" id="p-category"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div class="form-group"><label>Precio CUP *</label><input type="number" step="any" id="p-price-cup" required min="0"></div>
+                <div class="form-group"><label>Costo CUP *</label><input type="number" step="any" id="p-cost-cup" required min="0"></div>
+            </div>
+            <div class="form-group"><label>Stock</label><input type="number" id="p-stock" min="0"></div>
+            <div class="form-group"><label>Unidad</label><input type="text" id="p-unit" value="unidad"></div>
+            <div class="form-group"><label>Stock Mínimo</label><input type="number" id="p-min" value="5" min="0"></div>
+            <div class="form-group"><label>Imagen</label>
+                <input type="file" accept="image/*" id="p-image" onchange="previewImage(event)">
+                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                    <img id="p-image-preview" style="max-width:100px; display:none;">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('p-image-preview').src=''; document.getElementById('p-image').value='';" style="display:none;" id="p-remove-image">Eliminar</button>
+                </div>
+            </div>
+            <div class="form-group"><label><input type="checkbox" id="p-compuesto"> Producto Compuesto</label></div>
+            <h4>Lotes</h4>
+            <div id="lots-container"></div>
+            <button type="button" class="btn" onclick="addLotRow()"><i class="fas fa-plus"></i> Agregar Lote</button>
+            <h4>Receta (si es compuesto)</h4>
+            <div id="recipe-container"></div>
+            <button type="button" class="btn" onclick="addRecipeRow()"><i class="fas fa-utensils"></i> Agregar Ingrediente</button>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-success">Guardar</button>
+                <button type="button" class="btn" style="background:var(--text-muted);" onclick="closeModal('product-modal')">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Elaboración -->
+<div class="modal" id="elaboration-modal">
+    <div class="modal-content">
+        <h3>Nuevo Elaborado (Producción)</h3>
+        <form id="elaboration-form" onsubmit="saveElaboration(event)">
+            <div class="form-group">
+                <label>Producto</label>
+                <select id="elab-product-select" onchange="loadProductForElaboration()">
+                    <option value="">Seleccionar existente o crear nuevo...</option>
+                </select>
+                <button type="button" class="btn btn-sm" onclick="createNewProductForElaboration()"><i class="fas fa-plus"></i> Nuevo Producto</button>
+            </div>
+            <div id="elab-new-product-fields" style="display:none;">
+                <div class="form-group"><label>Nombre *</label><input type="text" id="elab-new-name" required></div>
+                <div class="form-group"><label>SKU (automático)</label><input type="text" id="elab-new-sku" readonly></div>
+                <div class="form-group"><label>Categoría</label><input type="text" id="elab-new-category"></div>
+                <div class="form-group"><label>Unidad</label><input type="text" id="elab-new-unit" value="unidad"></div>
+                <div class="form-group"><label>Imagen</label>
+                    <input type="file" accept="image/*" id="elab-new-image" onchange="previewElabImage(event)">
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                        <img id="elab-new-image-preview" style="max-width:100px; display:none;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('elab-new-image-preview').src=''; document.getElementById('elab-new-image').value='';" style="display:none;" id="elab-remove-image">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group"><label>Precio de Venta (CUP) *</label><input type="number" step="any" id="elab-price" required min="0"></div>
+            <div class="form-group"><label>Cantidad Elaborada *</label><input type="number" id="elab-quantity" required min="1" step="1"></div>
+            <h4>Ingredientes (Receta)</h4>
+            <div id="elab-ingredients-container">
+                <div class="elab-ingredient-row" style="display:flex; gap:10px; margin-bottom:10px;">
+                    <select class="elab-ingredient-product" style="flex:2;"><option value="">Seleccionar...</option></select>
+                    <input type="number" class="elab-ingredient-qty" placeholder="Cantidad" style="flex:1;" min="0" step="any">
+                    <button type="button" class="btn btn-danger" onclick="this.parentElement.remove(); calculateElaborationCost();"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <button type="button" class="btn" onclick="addElabIngredientRow()"><i class="fas fa-plus"></i> Agregar Ingrediente</button>
+            <div class="form-group"><label>Otros Costos (CUP)</label><input type="number" step="any" id="elab-other-costs" value="0" min="0" oninput="calculateElaborationCost()"></div>
+            <div class="form-group">
+                <label>Costo Total de Elaboración (CUP)</label>
+                <input type="text" id="elab-total-cost" readonly style="background:var(--bg);">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-success">Registrar Elaboración</button>
+                <button type="button" class="btn" style="background:var(--text-muted);" onclick="closeModal('elaboration-modal')">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Compra -->
+<div class="modal" id="purchase-modal">
+    <div class="modal-content">
+        <h3>Nueva Compra</h3>
+        <form id="purchase-form" onsubmit="savePurchase(event)">
+            <div class="form-group"><label>Proveedor (opcional)</label>
+                <select id="purchase-supplier"><option value="">Sin proveedor</option></select>
+            </div>
+            <div id="purchase-items-container"></div>
+            <button type="button" class="btn" onclick="addPurchaseItemRow()"><i class="fas fa-plus"></i> Agregar Producto</button>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-success">Registrar Compra</button>
+                <button type="button" class="btn" style="background:var(--text-muted);" onclick="closeModal('purchase-modal')">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Cliente -->
+<div class="modal" id="client-modal">
+    <div class="modal-content">
+        <h3>Cliente / Proveedor</h3>
+        <form id="client-form" onsubmit="saveClient(event)">
+            <input type="hidden" id="client-id">
+            <div class="form-group"><label>Nombre *</label><input type="text" id="c-name" required></div>
+            <div class="form-group"><label>NIT</label><input type="text" id="c-nit"></div>
+            <div class="form-group"><label>Contacto</label><input type="text" id="c-contact"></div>
+            <div class="form-group"><label>Saldo Inicial</label><input type="number" step="any" id="c-balance" value="0"></div>
+            <div class="form-group"><label>Tipo</label>
+                <select id="c-type-select"><option value="cliente">Cliente</option><option value="proveedor">Proveedor</option></select>
+            </div>
+            <button type="submit" class="btn btn-success">Guardar</button>
+        </form>
+    </div>
+</div>
+
+<!-- Empleado -->
+<div class="modal" id="employee-modal">
+    <div class="modal-content">
+        <h3>Empleado</h3>
+        <form id="employee-form" onsubmit="saveEmployee(event)">
+            <input type="hidden" id="employee-id">
+            <div class="form-group"><label>Nombre *</label><input type="text" id="e-name" required></div>
+            <div class="form-group"><label>Cargo</label><input type="text" id="e-role" value="Vendedor"></div>
+            <div class="form-group"><label>Salario Base (CUP)</label><input type="number" step="any" id="e-salary" value="0" min="0"></div>
+            <div class="form-group"><label>Comisión % sobre ventas</label><input type="number" step="any" id="e-commission" value="0" min="0" max="100"></div>
+            <button type="submit" class="btn btn-success">Guardar</button>
+        </form>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ======================================================================
+// 1. BASE DE DATOS (Dexie)
+// ======================================================================
+const db = new Dexie('TCPGestorProDB');
+db.version(6).stores({
+    products: '++id, sku, name, category, esCompuesto',
+    lots: '++id, productId, expiryDate, quantity, costCup',
+    recipes: '++id, productId, yield',
+    recipeItems: '++id, recipeId, ingredientId, quantity',
+    sales: '++id, date, total, paymentMethod, clientId, currency, discount',
+    saleItems: '++id, saleId, productId, qty, price, lotId, costCup',
+    purchases: '++id, date, supplierId, total, status, type',
+    purchaseItems: '++id, purchaseId, productId, quantity, costCup, expiryDate',
+    movements: '++id, date, type, amount, category, description',
+    clients: '++id, name, nit, contact, balance, type',
+    invoices: '++id, saleId, xml, hash, qrData, date',
+    orders: '++id, date, clientId, items, total, status',
+    employees: '++id, name, role, salary, commission',
+    attendance: '++id, employeeId, date, type, lat, lng',
+    audit: '++id, date, user, entity, action, details',
+    settings: 'key'
+});
+db.open();
+
+// ======================================================================
+// 2. UTILIDADES UI
+// ======================================================================
+function toast(msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const div = document.createElement('div');
+    div.className = `toast ${type}`;
+    div.textContent = msg;
+    container.appendChild(div);
+    setTimeout(() => div.remove(), 4000);
+}
+
+function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const main = document.getElementById('main-content');
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('mobile-open');
+    } else {
+        sidebar.classList.toggle('closed');
+        main.classList.toggle('expanded');
+    }
+}
+
+function toggleTheme() {
+    const html = document.body;
+    const current = html.getAttribute('data-theme');
+    const newTheme = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', newTheme);
+    document.getElementById('theme-icon').className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    localStorage.setItem('theme', newTheme);
+}
+
+function logout() {
+    if (confirm('¿Cerrar sesión?')) {
+        localStorage.removeItem('auth');
+        location.reload();
+    }
+}
+
+// ======================================================================
+// 3. NAVEGACIÓN
+// ======================================================================
+document.querySelectorAll('.sidebar-menu a[data-view]').forEach(link => {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const view = this.dataset.view;
+        switchView(view);
+    });
+});
+
+function switchView(view) {
+    document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+    document.getElementById(`view-${view}`).classList.add('active');
+    document.querySelectorAll('.sidebar-menu a[data-view]').forEach(a => a.classList.remove('active'));
+    document.querySelector(`.sidebar-menu a[data-view="${view}"]`).classList.add('active');
+    document.getElementById('view-title').textContent = document.querySelector(`.sidebar-menu a[data-view="${view}"]`).textContent.trim();
+
+    switch(view) {
+        case 'dashboard': loadDashboard(); break;
+        case 'pos': loadPOS(); loadClientsSelect(); loadOrders(); break;
+        case 'inventory': loadInventory(); break;
+        case 'purchases': loadPurchases(); break;
+        case 'finances': loadFinances(); loadMovements(); break;
+        case 'crm': loadCRM(); break;
+        case 'hr': loadHR(); break;
+        case 'settings': loadSettings(); break;
+    }
+    if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('mobile-open');
+}
+
+// ======================================================================
+// 4. DASHBOARD
+// ======================================================================
+let salesChart = null;
+
+async function loadDashboard() {
+    const today = new Date().toISOString().split('T')[0];
+    const month = today.slice(0, 7);
+    const salesToday = await db.sales.where('date').startsWith(today).toArray();
+    const totalToday = salesToday.reduce((sum, s) => sum + s.total, 0);
+    document.getElementById('kpi-sales-today').textContent = totalToday.toFixed(2);
+    const salesMonth = await db.sales.where('date').startsWith(month).toArray();
+    const totalMonth = salesMonth.reduce((sum, s) => sum + s.total, 0);
+    document.getElementById('kpi-income-month').textContent = totalMonth.toFixed(2);
+    const products = await db.products.toArray();
+    const lowStock = products.filter(p => p.stock <= p.min).length;
+    document.getElementById('kpi-low-stock').textContent = lowStock;
+    document.getElementById('kpi-tax').textContent = (totalMonth * 0.1).toFixed(2);
+
+    const labels = [];
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        labels.push(key);
+        const sales = await db.sales.where('date').startsWith(key).toArray();
+        data.push(sales.reduce((s, x) => s + x.total, 0));
+    }
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    if (salesChart) salesChart.destroy();
+    salesChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Ventas (CUP)', data, backgroundColor: '#0d47a1' }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const alerts = [];
+    if (lowStock > 0) alerts.push(`${lowStock} productos con stock bajo.`);
+    const expiringLots = await db.lots.where('expiryDate').below(new Date(Date.now() + 7*86400000).toISOString()).toArray();
+    if (expiringLots.length > 0) alerts.push(`${expiringLots.length} lotes próximos a vencer.`);
+    document.getElementById('alerts-container').innerHTML = alerts.length ? alerts.join('<br>') : 'Sin alertas.';
+}
+
+// ======================================================================
+// 5. INVENTARIO
+// ======================================================================
+let inventoryPage = 1;
+const PAGE_SIZE = 10;
+
+async function loadInventory(page = 1) {
+    inventoryPage = page;
+    const products = await db.products.toArray();
+    const total = products.length;
+    const start = (page - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const pageItems = products.slice(start, end);
+    const tbody = document.getElementById('inventory-tbody');
+    tbody.innerHTML = '';
+    for (const p of pageItems) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.sku}</td>
+            <td>${p.name}</td>
+            <td>${p.category || '-'}</td>
+            <td>${p.stock}</td>
+            <td>${p.priceCup}</td>
+            <td>
+                <button class="btn btn-sm" onclick="openProductModal(${p.id})"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    }
+    const pag = document.getElementById('inventory-pagination');
+    const pages = Math.ceil(total / PAGE_SIZE);
+    pag.innerHTML = '';
+    for (let i = 1; i <= pages; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = i === page ? 'active' : '';
+        btn.onclick = () => loadInventory(i);
+        pag.appendChild(btn);
+    }
+}
+
+async function openProductModal(id = null) {
+    const modal = document.getElementById('product-modal');
+    document.getElementById('product-id').value = id || '';
+    document.getElementById('product-modal-title').textContent = id ? 'Editar Producto' : 'Nuevo Producto';
+    document.getElementById('lots-container').innerHTML = '';
+    document.getElementById('recipe-container').innerHTML = '';
+    document.getElementById('p-image-preview').style.display = 'none';
+    document.getElementById('p-remove-image').style.display = 'none';
+
+    if (id) {
+        const p = await db.products.get(id);
+        if (!p) return toast('Producto no encontrado', 'error');
+        document.getElementById('p-name').value = p.name;
+        document.getElementById('p-sku').value = p.sku;
+        document.getElementById('p-category').value = p.category || '';
+        document.getElementById('p-price-cup').value = p.priceCup;
+        document.getElementById('p-cost-cup').value = p.costCup;
+        document.getElementById('p-stock').value = p.stock || 0;
+        document.getElementById('p-unit').value = p.unit || 'unidad';
+        document.getElementById('p-min').value = p.min || 5;
+        document.getElementById('p-compuesto').checked = p.esCompuesto || false;
+        if (p.image) {
+            document.getElementById('p-image-preview').src = p.image;
+            document.getElementById('p-image-preview').style.display = 'block';
+            document.getElementById('p-remove-image').style.display = 'inline-block';
+        }
+        const lots = await db.lots.where('productId').equals(id).toArray();
+        lots.forEach(l => addLotRow(l));
+        const recipe = await db.recipes.where('productId').equals(id).first();
+        if (recipe) {
+            const items = await db.recipeItems.where('recipeId').equals(recipe.id).toArray();
+            const ingredients = await db.products.toArray();
+            items.forEach(it => {
+                const row = document.createElement('div');
+                row.className = 'recipe-row';
+                row.style.display = 'flex';
+                row.style.gap = '10px';
+                row.style.marginBottom = '10px';
+                const select = document.createElement('select');
+                select.className = 'recipe-ingredient';
+                select.style.flex = '2';
+                select.innerHTML = '<option value="">Seleccionar...</option>';
+                ingredients.forEach(prod => {
+                    const opt = document.createElement('option');
+                    opt.value = prod.id;
+                    opt.textContent = `${prod.name} (${prod.sku})`;
+                    if (prod.id === it.ingredientId) opt.selected = true;
+                    select.appendChild(opt);
+                });
+                const qty = document.createElement('input');
+                qty.type = 'number';
+                qty.className = 'recipe-qty';
+                qty.placeholder = 'Cantidad';
+                qty.style.flex = '1';
+                qty.step = 'any';
+                qty.min = '0';
+                qty.value = it.quantity;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-danger btn-sm';
+                btn.innerHTML = '<i class="fas fa-times"></i>';
+                btn.onclick = () => row.remove();
+                row.appendChild(select);
+                row.appendChild(qty);
+                row.appendChild(btn);
+                document.getElementById('recipe-container').appendChild(row);
+            });
+        }
+    } else {
+        document.getElementById('product-form').reset();
+        document.getElementById('p-sku').value = 'PROD-' + Date.now();
+        document.getElementById('p-compuesto').checked = false;
+    }
+    modal.classList.add('open');
+}
+
+async function saveProduct(e) {
+    e.preventDefault();
+    showLoading();
+    try {
+        const id = document.getElementById('product-id').value;
+        const name = document.getElementById('p-name').value.trim();
+        const sku = document.getElementById('p-sku').value.trim();
+        const category = document.getElementById('p-category').value.trim();
+        const price = parseFloat(document.getElementById('p-price-cup').value);
+        const cost = parseFloat(document.getElementById('p-cost-cup').value);
+        const stock = parseInt(document.getElementById('p-stock').value) || 0;
+        const unit = document.getElementById('p-unit').value.trim() || 'unidad';
+        const min = parseInt(document.getElementById('p-min').value) || 5;
+        const esCompuesto = document.getElementById('p-compuesto').checked;
+        const image = document.getElementById('p-image-preview').src || '';
+
+        if (!name || !sku || isNaN(price) || isNaN(cost)) {
+            toast('Complete todos los campos obligatorios', 'error');
+            hideLoading();
+            return;
+        }
+        const existing = await db.products.where('sku').equals(sku).first();
+        if (existing && existing.id != id) {
+            toast('SKU ya existe', 'error');
+            hideLoading();
+            return;
+        }
+
+        const productData = { name, sku, category, priceCup: price, costCup: cost, stock, unit, min, esCompuesto, image };
+        let productId;
+        if (id) {
+            await db.products.update(parseInt(id), productData);
+            productId = parseInt(id);
+            toast('Producto actualizado', 'success');
+        } else {
+            productId = await db.products.add(productData);
+            toast('Producto creado', 'success');
+        }
+
+        const lotRows = document.querySelectorAll('.lot-row');
+        for (const row of lotRows) {
+            const qty = parseFloat(row.querySelector('.lot-qty').value) || 0;
+            const costLot = parseFloat(row.querySelector('.lot-cost').value) || 0;
+            const expiry = row.querySelector('.lot-expiry').value || null;
+            const lotId = row.dataset.lotId;
+            if (qty > 0) {
+                if (lotId) {
+                    await db.lots.update(parseInt(lotId), { quantity: qty, costCup: costLot, expiryDate: expiry });
+                } else {
+                    await db.lots.add({ productId, quantity: qty, costCup: costLot, expiryDate: expiry });
+                }
+            } else if (lotId) {
+                await db.lots.delete(parseInt(lotId));
+            }
+        }
+
+        if (esCompuesto) {
+            let recipe = await db.recipes.where('productId').equals(productId).first();
+            if (!recipe) {
+                const recipeId = await db.recipes.add({ productId, yield: 1 });
+                recipe = { id: recipeId, productId, yield: 1 };
+            }
+            await db.recipeItems.where('recipeId').equals(recipe.id).delete();
+            const rows = document.querySelectorAll('.recipe-row');
+            for (const row of rows) {
+                const ingredientId = parseInt(row.querySelector('.recipe-ingredient').value);
+                const qty = parseFloat(row.querySelector('.recipe-qty').value) || 0;
+                if (ingredientId && qty > 0) {
+                    await db.recipeItems.add({ recipeId: recipe.id, ingredientId, quantity: qty });
+                }
+            }
+        } else {
+            const recipe = await db.recipes.where('productId').equals(productId).first();
+            if (recipe) {
+                await db.recipeItems.where('recipeId').equals(recipe.id).delete();
+                await db.recipes.delete(recipe.id);
+            }
+        }
+
+        closeModal('product-modal');
+        loadInventory();
+        loadPOS();
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function deleteProduct(id) {
+    if (!confirm('¿Eliminar producto?')) return;
+    showLoading();
+    try {
+        await db.products.delete(id);
+        await db.lots.where('productId').equals(id).delete();
+        const recipe = await db.recipes.where('productId').equals(id).first();
+        if (recipe) {
+            await db.recipeItems.where('recipeId').equals(recipe.id).delete();
+            await db.recipes.delete(recipe.id);
+        }
+        toast('Producto eliminado', 'success');
+        loadInventory();
+        loadPOS();
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function addLotRow(lot = null) {
+    const container = document.getElementById('lots-container');
+    const row = document.createElement('div');
+    row.className = 'lot-row';
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.marginBottom = '10px';
+    if (lot) row.dataset.lotId = lot.id;
+    row.innerHTML = `
+        <input type="number" class="lot-qty" placeholder="Cantidad" style="flex:1;" min="0" step="any" value="${lot ? lot.quantity : ''}">
+        <input type="number" class="lot-cost" placeholder="Costo CUP" style="flex:1;" min="0" step="any" value="${lot ? lot.costCup : ''}">
+        <input type="date" class="lot-expiry" style="flex:1;" value="${lot ? lot.expiryDate : ''}">
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+    `;
+    container.appendChild(row);
+}
+
+function addRecipeRow() {
+    const container = document.getElementById('recipe-container');
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.marginBottom = '10px';
+    const select = document.createElement('select');
+    select.className = 'recipe-ingredient';
+    select.style.flex = '2';
+    select.innerHTML = '<option value="">Seleccionar...</option>';
+    db.products.toArray().then(products => {
+        products.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.name} (${p.sku})`;
+            select.appendChild(opt);
+        });
+    });
+    const qty = document.createElement('input');
+    qty.type = 'number';
+    qty.className = 'recipe-qty';
+    qty.placeholder = 'Cantidad';
+    qty.style.flex = '1';
+    qty.step = 'any';
+    qty.min = '0';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-danger btn-sm';
+    btn.innerHTML = '<i class="fas fa-times"></i>';
+    btn.onclick = () => row.remove();
+    row.appendChild(select);
+    row.appendChild(qty);
+    row.appendChild(btn);
+    container.appendChild(row);
+}
+
+function previewImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const img = document.getElementById('p-image-preview');
+        img.src = ev.target.result;
+        img.style.display = 'block';
+        document.getElementById('p-remove-image').style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function previewElabImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const img = document.getElementById('elab-new-image-preview');
+        img.src = ev.target.result;
+        img.style.display = 'block';
+        document.getElementById('elab-remove-image').style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+}
+
+// ======================================================================
+// 6. EXPORTAR / IMPORTAR EXCEL
+// ======================================================================
+async function exportExcel() {
+    const products = await db.products.toArray();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(products);
+    XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+    XLSX.writeFile(wb, 'inventario.xlsx');
+    toast('Exportado', 'success');
+}
+
+function importExcel(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws);
+            for (const row of json) {
+                const product = {
+                    sku: row.sku || row.SKU || '',
+                    name: row.name || row.Nombre || '',
+                    category: row.category || row.Categoría || '',
+                    stock: parseFloat(row.stock || row.Stock) || 0,
+                    priceCup: parseFloat(row.priceCup || row.Precio) || 0,
+                    costCup: parseFloat(row.costCup || row.Costo) || 0,
+                    unit: row.unit || row.Unidad || 'unidad',
+                    min: parseFloat(row.min || row.Minimo) || 5,
+                    esCompuesto: false,
+                    image: ''
+                };
+                if (product.sku && product.name) {
+                    const existing = await db.products.where('sku').equals(product.sku).first();
+                    if (existing) {
+                        await db.products.update(existing.id, product);
+                    } else {
+                        await db.products.add(product);
+                    }
+                }
+            }
+            toast('Importación completada', 'success');
+            loadInventory();
+            loadPOS();
+        } catch (err) {
+            toast('Error al importar: ' + err.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = '';
+}
+
+// ======================================================================
+// 7. POS
+// ======================================================================
+let cart = [];
+let cartTotal = 0;
+let posProducts = [];
+
+async function loadPOS() {
+    posProducts = await db.products.toArray();
+    renderPOS(posProducts);
+}
+
+function renderPOS(products) {
+    const grid = document.getElementById('pos-grid');
+    grid.innerHTML = '';
+    products.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'pos-item';
+        div.innerHTML = `
+            ${p.image ? `<img src="${p.image}" alt="${p.name}">` : '<i class="fas fa-box" style="font-size:2rem;"></i>'}
+            <div><strong>${p.name}</strong></div>
+            <div>${p.priceCup} CUP</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);">Stock: ${p.stock}</div>
+        `;
+        div.onclick = () => addToCart(p.id);
+        grid.appendChild(div);
+    });
+}
+
+function filterPOS() {
+    const q = document.getElementById('pos-search').value.toLowerCase();
+    const filtered = posProducts.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    renderPOS(filtered);
+}
+
+function startScanner() {
+    const code = prompt('Ingrese código de barras / SKU:');
+    if (code) {
+        const product = posProducts.find(p => p.sku === code);
+        if (product) addToCart(product.id);
+        else toast('Producto no encontrado', 'error');
+    }
+}
+
+async function addToCart(productId) {
+    const product = await db.products.get(productId);
+    if (!product) return toast('Producto no encontrado', 'error');
+    if (product.stock < 1) return toast('Sin stock', 'error');
+    const existing = cart.find(item => item.id === productId);
+    if (existing) {
+        existing.qty++;
+    } else {
+        cart.push({ id: productId, name: product.name, price: product.priceCup, qty: 1, cost: product.costCup });
+    }
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('pos-cart');
+    container.innerHTML = '';
+    let subtotal = 0;
+    cart.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'cart-item';
+        div.innerHTML = `
+            <span>${item.name} x${item.qty}</span>
+            <span>${(item.price * item.qty).toFixed(2)} CUP</span>
+            <button class="btn btn-danger btn-sm" onclick="removeFromCart(${index})"><i class="fas fa-times"></i></button>
+        `;
+        container.appendChild(div);
+        subtotal += item.price * item.qty;
+    });
+    document.getElementById('pos-subtotal').textContent = subtotal.toFixed(2) + ' CUP';
+    updateCartTotals();
+}
+
+function updateCartTotals() {
+    const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+    const discount = parseFloat(document.getElementById('pos-discount').value) || 0;
+    const total = subtotal * (1 - discount / 100);
+    document.getElementById('pos-total').textContent = total.toFixed(2) + ' CUP';
+    cartTotal = total;
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
+
+function clearCart() {
+    cart = [];
+    renderCart();
+}
+
+function addPaymentMethod() {
+    const container = document.getElementById('pos-payments');
+    const div = document.createElement('div');
+    div.style.display = 'flex';
+    div.style.gap = '10px';
+    div.style.alignItems = 'center';
+    div.style.marginTop = '5px';
+    div.innerHTML = `
+        <select class="payment-method" style="flex:2;">
+            <option value="efectivo">Efectivo</option>
+            <option value="transfermovil">Transfermóvil</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="credito">Cuenta Corriente</option>
+        </select>
+        <input type="number" class="payment-amount" placeholder="Monto" style="flex:1;">
+        <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+    `;
+    container.appendChild(div);
+}
+
+async function checkout() {
+    if (cart.length === 0) return toast('Carrito vacío', 'error');
+    showLoading();
+    try {
+        const clientId = document.getElementById('pos-client').value;
+        const discount = parseFloat(document.getElementById('pos-discount').value) || 0;
+        const currency = document.getElementById('pos-currency').value;
+        const total = cartTotal;
+        const saleId = await db.sales.add({
+            date: new Date().toISOString(),
+            total: total,
+            discount: discount,
+            currency: currency,
+            clientId: clientId ? parseInt(clientId) : null,
+            paymentMethod: 'mixto'
+        });
+        for (const item of cart) {
+            const product = await db.products.get(item.id);
+            if (!product) continue;
+            if (product.esCompuesto) {
+                await deductRecipe(item.id, item.qty);
+            } else {
+                await deductStockFIFO(item.id, item.qty);
+            }
+            await db.saleItems.add({
+                saleId: saleId,
+                productId: item.id,
+                qty: item.qty,
+                price: item.price,
+                costCup: item.cost,
+                lotId: null
+            });
+        }
+        await db.movements.add({
+            date: new Date().toISOString(),
+            type: 'ingreso',
+            amount: total,
+            category: 'Ventas',
+            description: `Venta #${saleId}`
+        });
+        toast('Venta registrada', 'success');
+        clearCart();
+        loadDashboard();
+        loadPOS();
+        loadOrders();
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function deductStockFIFO(productId, qtyNeeded) {
+    let lots = await db.lots.where('productId').equals(productId).sortBy('expiryDate');
+    let remaining = qtyNeeded;
+    for (let lot of lots) {
+        if (remaining <= 0) break;
+        const used = Math.min(lot.quantity, remaining);
+        lot.quantity -= used;
+        remaining -= used;
+        if (lot.quantity === 0) await db.lots.delete(lot.id);
+        else await db.lots.put(lot);
+    }
+    if (remaining > 0) throw new Error(`Stock insuficiente para producto ${productId}. Faltan ${remaining}`);
+    const allLots = await db.lots.where('productId').equals(productId).toArray();
+    const total = allLots.reduce((acc, l) => acc + l.quantity, 0);
+    await db.products.update(productId, { stock: total });
+}
+
+async function deductRecipe(productId, qtySold) {
+    const recipe = await db.recipes.where('productId').equals(productId).first();
+    if (!recipe) return;
+    const items = await db.recipeItems.where('recipeId').equals(recipe.id).toArray();
+    for (let item of items) {
+        const needed = (item.quantity / recipe.yield) * qtySold;
+        await deductStockFIFO(item.ingredientId, needed);
+    }
+}
+
+async function loadClientsSelect() {
+    const clients = await db.clients.where('type').equals('cliente').toArray();
+    const select = document.getElementById('pos-client');
+    select.innerHTML = '<option value="">Sin cliente</option>';
+    clients.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        select.appendChild(opt);
+    });
+}
+
+async function createOrder() {
+    if (cart.length === 0) return toast('Carrito vacío', 'error');
+    const clientId = document.getElementById('pos-client').value;
+    const total = cartTotal;
+    const orderId = await db.orders.add({
+        date: new Date().toISOString(),
+        clientId: clientId ? parseInt(clientId) : null,
+        items: JSON.stringify(cart),
+        total: total,
+        status: 'activo'
+    });
+    toast('Pedido creado', 'success');
+    clearCart();
+    loadOrders();
+}
+
+async function loadOrders() {
+    const orders = await db.orders.where('status').equals('activo').toArray();
+    const container = document.getElementById('orders-list');
+    container.innerHTML = '';
+    if (orders.length === 0) return container.textContent = 'Sin pedidos activos.';
+    for (const order of orders) {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '10px';
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between;">
+                <span><strong>Pedido #${order.id}</strong> - ${new Date(order.date).toLocaleDateString()}</span>
+                <span>Total: ${order.total.toFixed(2)} CUP</span>
+                <div>
+                    <button class="btn btn-success btn-sm" onclick="completeOrder(${order.id})"><i class="fas fa-check"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="cancelOrder(${order.id})"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div style="font-size:0.9rem;">Items: ${JSON.parse(order.items).map(i => `${i.name} x${i.qty}`).join(', ')}</div>
+        `;
+        container.appendChild(div);
+    }
+}
+
+async function completeOrder(orderId) {
+    const order = await db.orders.get(orderId);
+    if (!order) return;
+    cart = JSON.parse(order.items);
+    await checkout();
+    await db.orders.update(orderId, { status: 'completado' });
+    loadOrders();
+}
+
+async function cancelOrder(orderId) {
+    if (!confirm('¿Cancelar pedido?')) return;
+    await db.orders.update(orderId, { status: 'cancelado' });
+    loadOrders();
+}
+
+// ======================================================================
+// 8. COMPRAS
+// ======================================================================
+async function loadPurchases() {
+    const purchases = await db.purchases.toArray();
+    const container = document.getElementById('purchases-list');
+    container.innerHTML = '';
+    if (purchases.length === 0) return container.textContent = 'Sin compras registradas.';
+    for (const p of purchases) {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '10px';
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between;">
+                <span><strong>Compra #${p.id}</strong> - ${new Date(p.date).toLocaleDateString()}</span>
+                <span>Total: ${p.total.toFixed(2)} CUP</span>
+                <span class="badge badge-success">${p.status}</span>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+}
+
+async function openPurchaseModal() {
+    const modal = document.getElementById('purchase-modal');
+    document.getElementById('purchase-items-container').innerHTML = '';
+    addPurchaseItemRow();
+    const suppliers = await db.clients.where('type').equals('proveedor').toArray();
+    const select = document.getElementById('purchase-supplier');
+    select.innerHTML = '<option value="">Sin proveedor</option>';
+    suppliers.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        select.appendChild(opt);
+    });
+    modal.classList.add('open');
+}
+
+function addPurchaseItemRow() {
+    const container = document.getElementById('purchase-items-container');
+    const div = document.createElement('div');
+    div.className = 'purchase-item';
+    div.innerHTML = `
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+            <select class="purchase-product-select" style="flex:3;">
+                <option value="">Seleccionar producto...</option>
+                <option value="__new__">+ Crear nuevo</option>
+            </select>
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.purchase-item').remove()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="purchase-new-product" style="display:none; border:1px dashed var(--border); padding:10px; border-radius:6px; margin-bottom:10px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div class="form-group"><label>Nombre *</label><input type="text" class="p-new-name" required></div>
+                <div class="form-group"><label>SKU (automático)</label><input type="text" class="p-new-sku" readonly value="PROD-${Date.now()}"></div>
+                <div class="form-group"><label>Categoría</label><input type="text" class="p-new-category"></div>
+                <div class="form-group"><label>Unidad</label><input type="text" class="p-new-unit" value="unidad"></div>
+                <div class="form-group"><label>Costo de compra (CUP) *</label><input type="number" step="any" class="p-new-cost" required min="0"></div>
+                <div class="form-group"><label>Precio de venta (CUP) *</label><input type="number" step="any" class="p-new-price" required min="0"></div>
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="saveNewProductFromPurchase(this)"><i class="fas fa-save"></i> Guardar producto</button>
+        </div>
+        <div class="purchase-details" style="display:none; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:10px;">
+            <div class="form-group"><label>Cantidad *</label><input type="number" class="purchase-qty" min="0" step="any" required></div>
+            <div class="form-group"><label>Costo unitario (CUP) *</label><input type="number" step="any" class="purchase-cost" min="0" required></div>
+            <div class="form-group"><label>Vencimiento</label><input type="date" class="purchase-expiry"></div>
+        </div>
+    `;
+    container.appendChild(div);
+    const select = div.querySelector('.purchase-product-select');
+    db.products.toArray().then(products => {
+        products.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.name} (${p.sku}) - ${p.priceCup} CUP`;
+            select.appendChild(opt);
+        });
+    });
+    select.addEventListener('change', function() {
+        const item = this.closest('.purchase-item');
+        const newDiv = item.querySelector('.purchase-new-product');
+        const detailsDiv = item.querySelector('.purchase-details');
+        if (this.value === '__new__') {
+            newDiv.style.display = 'block';
+            detailsDiv.style.display = 'none';
+            const skuInput = newDiv.querySelector('.p-new-sku');
+            skuInput.value = 'PROD-' + Date.now();
+        } else if (this.value) {
+            newDiv.style.display = 'none';
+            detailsDiv.style.display = 'grid';
+            const productId = parseInt(this.value);
+            db.products.get(productId).then(p => {
+                if (p) {
+                    const costInput = detailsDiv.querySelector('.purchase-cost');
+                    costInput.value = p.costCup || 0;
+                }
+            });
+        } else {
+            newDiv.style.display = 'none';
+            detailsDiv.style.display = 'none';
+        }
+    });
+}
+
+async function saveNewProductFromPurchase(btn) {
+    const item = btn.closest('.purchase-item');
+    const newDiv = item.querySelector('.purchase-new-product');
+    const name = newDiv.querySelector('.p-new-name').value.trim();
+    const sku = newDiv.querySelector('.p-new-sku').value.trim();
+    const category = newDiv.querySelector('.p-new-category').value.trim();
+    const unit = newDiv.querySelector('.p-new-unit').value.trim() || 'unidad';
+    const cost = parseFloat(newDiv.querySelector('.p-new-cost').value);
+    const price = parseFloat(newDiv.querySelector('.p-new-price').value);
+
+    if (!name || !cost || !price) {
+        toast('Complete todos los campos obligatorios', 'error');
+        return;
+    }
+
+    try {
+        const existing = await db.products.where('sku').equals(sku).first();
+        if (existing) {
+            toast('SKU ya existe', 'error');
+            return;
+        }
+
+        const newId = await db.products.add({
+            name, sku, category, unit,
+            costCup: cost,
+            priceCup: price,
+            stock: 0,
+            min: 5,
+            esCompuesto: false,
+            image: ''
+        });
+        toast('Producto creado', 'success');
+
+        const select = item.querySelector('.purchase-product-select');
+        const opt = document.createElement('option');
+        opt.value = newId;
+        opt.textContent = `${name} (${sku}) - ${price} CUP`;
+        const newOpt = select.querySelector('option[value="__new__"]');
+        select.insertBefore(opt, newOpt);
+        select.value = newId;
+
+        newDiv.style.display = 'none';
+        const detailsDiv = item.querySelector('.purchase-details');
+        detailsDiv.style.display = 'grid';
+        const costInput = detailsDiv.querySelector('.purchase-cost');
+        if (costInput) costInput.value = cost;
+        const qtyInput = detailsDiv.querySelector('.purchase-qty');
+        if (qtyInput) qtyInput.value = '';
+
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        toast('¡Producto guardado! Ahora ingresa la cantidad y el costo unitario (si es diferente).', 'success');
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    }
+}
+
+async function savePurchase(e) {
+    e.preventDefault();
+    showLoading();
+    try {
+        const supplierId = document.getElementById('purchase-supplier').value;
+        const items = document.querySelectorAll('.purchase-item');
+        let total = 0;
+        let purchaseItems = [];
+        for (const item of items) {
+            const select = item.querySelector('.purchase-product-select');
+            const productId = select.value;
+            if (!productId || productId === '__new__') {
+                if (productId === '__new__') {
+                    toast('Hay un producto nuevo sin guardar', 'error');
+                    hideLoading();
+                    return;
+                }
+                continue;
+            }
+            const detailsDiv = item.querySelector('.purchase-details');
+            const qty = parseFloat(detailsDiv.querySelector('.purchase-qty').value) || 0;
+            const cost = parseFloat(detailsDiv.querySelector('.purchase-cost').value) || 0;
+            const expiry = detailsDiv.querySelector('.purchase-expiry').value || null;
+            if (qty <= 0 || cost <= 0) {
+                toast('Cantidad y costo deben ser > 0', 'error');
+                hideLoading();
+                return;
+            }
+            total += qty * cost;
+            purchaseItems.push({ productId: parseInt(productId), quantity: qty, costCup: cost, expiryDate: expiry });
+        }
+        if (purchaseItems.length === 0) {
+            toast('Agregue al menos un producto', 'error');
+            hideLoading();
+            return;
+        }
+        await db.transaction('rw', db.purchases, db.purchaseItems, db.lots, db.products, db.movements, async () => {
+            const purchaseId = await db.purchases.add({
+                date: new Date().toISOString(),
+                supplierId: supplierId ? parseInt(supplierId) : null,
+                total: total,
+                status: 'completada'
+            });
+            for (const item of purchaseItems) {
+                await db.purchaseItems.add({
+                    purchaseId: purchaseId,
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    costCup: item.costCup,
+                    expiryDate: item.expiryDate
+                });
+                await db.lots.add({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    costCup: item.costCup,
+                    expiryDate: item.expiryDate
+                });
+                const allLots = await db.lots.where('productId').equals(item.productId).toArray();
+                const totalStock = allLots.reduce((a, l) => a + l.quantity, 0);
+                await db.products.update(item.productId, { stock: totalStock });
+            }
+            await db.movements.add({
+                date: new Date().toISOString(),
+                type: 'gasto',
+                amount: total,
+                category: 'Compras',
+                description: `Compra #${purchaseId}`
+            });
+        });
+        closeModal('purchase-modal');
+        loadPurchases();
+        loadInventory();
+        loadPOS();
+        toast('Compra registrada', 'success');
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// ======================================================================
+// 9. ELABORACIÓN
+// ======================================================================
+async function openElaborationModal() {
+    const modal = document.getElementById('elaboration-modal');
+    document.getElementById('elab-product-select').innerHTML = '<option value="">Seleccionar existente...</option>';
+    const products = await db.products.toArray();
+    products.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.sku})`;
+        document.getElementById('elab-product-select').appendChild(opt);
+    });
+    document.getElementById('elab-ingredients-container').innerHTML = '';
+    addElabIngredientRow();
+    document.getElementById('elab-new-product-fields').style.display = 'none';
+    document.getElementById('elab-price').value = '';
+    document.getElementById('elab-quantity').value = '';
+    document.getElementById('elab-other-costs').value = '0';
+    document.getElementById('elab-total-cost').value = '';
+    modal.classList.add('open');
+}
+
+function createNewProductForElaboration() {
+    document.getElementById('elab-new-product-fields').style.display = 'block';
+    document.getElementById('elab-new-sku').value = 'PROD-' + Date.now();
+}
+
+function loadProductForElaboration() {
+    document.getElementById('elab-new-product-fields').style.display = 'none';
+}
+
+function addElabIngredientRow() {
+    const container = document.getElementById('elab-ingredients-container');
+    const row = document.createElement('div');
+    row.className = 'elab-ingredient-row';
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.marginBottom = '10px';
+    const select = document.createElement('select');
+    select.className = 'elab-ingredient-product';
+    select.style.flex = '2';
+    select.innerHTML = '<option value="">Seleccionar...</option>';
+    db.products.toArray().then(products => {
+        products.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.name} (${p.sku})`;
+            select.appendChild(opt);
+        });
+    });
+    select.onchange = calculateElaborationCost;
+    const qty = document.createElement('input');
+    qty.type = 'number';
+    qty.className = 'elab-ingredient-qty';
+    qty.placeholder = 'Cantidad';
+    qty.style.flex = '1';
+    qty.min = '0';
+    qty.step = 'any';
+    qty.oninput = calculateElaborationCost;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-danger btn-sm';
+    btn.innerHTML = '<i class="fas fa-times"></i>';
+    btn.onclick = function() { row.remove(); calculateElaborationCost(); };
+    row.appendChild(select);
+    row.appendChild(qty);
+    row.appendChild(btn);
+    container.appendChild(row);
+}
+
+async function calculateElaborationCost() {
+    const rows = document.querySelectorAll('.elab-ingredient-row');
+    let totalCost = 0;
+    for (const row of rows) {
+        const select = row.querySelector('.elab-ingredient-product');
+        const qty = parseFloat(row.querySelector('.elab-ingredient-qty').value) || 0;
+        const productId = parseInt(select.value);
+        if (productId && qty > 0) {
+            const product = await db.products.get(productId);
+            if (product) {
+                totalCost += product.costCup * qty;
+            }
+        }
+    }
+    const other = parseFloat(document.getElementById('elab-other-costs').value) || 0;
+    totalCost += other;
+    document.getElementById('elab-total-cost').value = totalCost.toFixed(2);
+}
+
+async function saveElaboration(e) {
+    e.preventDefault();
+    showLoading();
+    try {
+        const productSelect = document.getElementById('elab-product-select');
+        let productId = productSelect.value;
+        let productName = '';
+        let productSku = '';
+        if (productId === '' && document.getElementById('elab-new-product-fields').style.display !== 'none') {
+            const name = document.getElementById('elab-new-name').value.trim();
+            const sku = document.getElementById('elab-new-sku').value.trim();
+            const category = document.getElementById('elab-new-category').value.trim();
+            const unit = document.getElementById('elab-new-unit').value.trim() || 'unidad';
+            const image = document.getElementById('elab-new-image-preview').src || '';
+            if (!name) {
+                toast('Ingrese nombre del nuevo producto', 'error');
+                hideLoading();
+                return;
+            }
+            const newId = await db.products.add({
+                name, sku, category, unit,
+                costCup: 0,
+                priceCup: parseFloat(document.getElementById('elab-price').value) || 0,
+                stock: 0,
+                min: 5,
+                esCompuesto: true,
+                image: image
+            });
+            productId = newId;
+            productName = name;
+            productSku = sku;
+            toast('Producto creado', 'success');
+        } else if (productId) {
+            const prod = await db.products.get(parseInt(productId));
+            if (prod) {
+                productName = prod.name;
+                productSku = prod.sku;
+            }
+        } else {
+            toast('Seleccione o cree un producto', 'error');
+            hideLoading();
+            return;
+        }
+
+        const price = parseFloat(document.getElementById('elab-price').value);
+        const quantity = parseFloat(document.getElementById('elab-quantity').value);
+        const totalCost = parseFloat(document.getElementById('elab-total-cost').value) || 0;
+        if (!price || !quantity || quantity <= 0) {
+            toast('Precio y cantidad válidos requeridos', 'error');
+            hideLoading();
+            return;
+        }
+
+        await db.products.update(parseInt(productId), {
+            priceCup: price,
+            costCup: totalCost / quantity,
+            esCompuesto: true
+        });
+
+        let recipe = await db.recipes.where('productId').equals(parseInt(productId)).first();
+        if (!recipe) {
+            const recipeId = await db.recipes.add({ productId: parseInt(productId), yield: quantity });
+            recipe = { id: recipeId };
+        } else {
+            await db.recipeItems.where('recipeId').equals(recipe.id).delete();
+        }
+        const rows = document.querySelectorAll('.elab-ingredient-row');
+        for (const row of rows) {
+            const ingredientId = parseInt(row.querySelector('.elab-ingredient-product').value);
+            const qty = parseFloat(row.querySelector('.elab-ingredient-qty').value) || 0;
+            if (ingredientId && qty > 0) {
+                await db.recipeItems.add({
+                    recipeId: recipe.id,
+                    ingredientId: ingredientId,
+                    quantity: qty
+                });
+            }
+        }
+
+        await db.purchases.add({
+            date: new Date().toISOString(),
+            supplierId: null,
+            total: totalCost,
+            status: 'elaboración',
+            type: 'elaboración'
+        });
+
+        const currentStock = (await db.products.get(parseInt(productId))).stock || 0;
+        await db.products.update(parseInt(productId), { stock: currentStock + quantity });
+
+        await db.lots.add({
+            productId: parseInt(productId),
+            quantity: quantity,
+            costCup: totalCost / quantity,
+            expiryDate: null
+        });
+
+        closeModal('elaboration-modal');
+        loadInventory();
+        loadPOS();
+        toast('Elaboración registrada', 'success');
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// ======================================================================
+// 10. FINANZAS
+// ======================================================================
+async function loadFinances() {
+    const movements = await db.movements.toArray();
+    const income = movements.filter(m => m.type === 'ingreso').reduce((s, m) => s + m.amount, 0);
+    const expenses = movements.filter(m => m.type === 'gasto').reduce((s, m) => s + m.amount, 0);
+    document.getElementById('fin-income').textContent = income.toFixed(2);
+    document.getElementById('fin-expenses').textContent = expenses.toFixed(2);
+    document.getElementById('fin-profit').textContent = (income - expenses).toFixed(2);
+    document.getElementById('fin-tax').textContent = (income * 0.1).toFixed(2);
+}
+
+async function loadMovements() {
+    const movements = await db.movements.toArray();
+    const container = document.getElementById('movements-list');
+    container.innerHTML = '';
+    if (movements.length === 0) return container.textContent = 'Sin movimientos.';
+    for (const m of movements.slice(-20).reverse()) {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.padding = '5px 0';
+        div.style.borderBottom = '1px solid var(--border)';
+        div.innerHTML = `
+            <span>${new Date(m.date).toLocaleDateString()} - ${m.description}</span>
+            <span style="color:${m.type === 'ingreso' ? 'var(--success)' : 'var(--danger)'};">${m.type === 'ingreso' ? '+' : '-'}${m.amount.toFixed(2)} CUP</span>
+        `;
+        container.appendChild(div);
+    }
+}
+
+async function addMovement() {
+    const desc = document.getElementById('mov-desc').value.trim();
+    const amount = parseFloat(document.getElementById('mov-amount').value);
+    const type = document.getElementById('mov-type').value;
+    const category = document.getElementById('mov-category').value;
+    if (!desc || !amount || amount <= 0) {
+        toast('Complete todos los campos', 'error');
+        return;
+    }
+    await db.movements.add({
+        date: new Date().toISOString(),
+        type: type,
+        amount: amount,
+        category: category,
+        description: desc
+    });
+    document.getElementById('mov-desc').value = '';
+    document.getElementById('mov-amount').value = '';
+    toast('Movimiento agregado', 'success');
+    loadFinances();
+    loadMovements();
+}
+
+function generateDJ08() {
+    toast('Generando DJ-08... (simulado)', 'info');
+    const doc = new jspdf.jsPDF();
+    doc.text('Declaración Jurada DJ-08', 10, 10);
+    doc.text('Empresa: ' + (document.getElementById('company-name').value || 'Mi TCP'), 10, 20);
+    doc.text('Fecha: ' + new Date().toLocaleDateString(), 10, 30);
+    doc.text('Ingresos: ' + document.getElementById('fin-income').textContent + ' CUP', 10, 40);
+    doc.text('Gastos: ' + document.getElementById('fin-expenses').textContent + ' CUP', 10, 50);
+    doc.text('Impuesto estimado: ' + document.getElementById('fin-tax').textContent + ' CUP', 10, 60);
+    doc.save('DJ08.pdf');
+    toast('PDF generado', 'success');
+}
+
+function generateInvoice() {
+    toast('Factura electrónica generada (simulada)', 'success');
+}
+
+function viewInvoices() {
+    toast('Listado de facturas (simulado)', 'info');
+}
+
+// ======================================================================
+// 11. CRM
+// ======================================================================
+async function loadCRM() {
+    const clients = await db.clients.toArray();
+    const container = document.getElementById('crm-list');
+    container.innerHTML = '';
+    if (clients.length === 0) return container.textContent = 'Sin clientes/proveedores.';
+    for (const c of clients) {
+        const div = document.createElement('div');
+        div.style.padding = '10px';
+        div.style.borderBottom = '1px solid var(--border)';
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between;">
+                <span><strong>${c.name}</strong> (${c.type}) - NIT: ${c.nit || '-'} - Saldo: ${c.balance || 0} CUP</span>
+                <div>
+                    <button class="btn btn-sm" onclick="openClientModal(${c.id})"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})"><i class="fas fa-trash"></i></button>
+                    <button class="btn btn-success btn-sm" onclick="registerPayment(${c.id})"><i class="fas fa-coins"></i></button>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+}
+
+async function openClientModal(id = null, type = 'cliente') {
+    const modal = document.getElementById('client-modal');
+    document.getElementById('client-id').value = id || '';
+    if (id) {
+        const c = await db.clients.get(id);
+        if (!c) return toast('No encontrado', 'error');
+        document.getElementById('c-name').value = c.name;
+        document.getElementById('c-nit').value = c.nit || '';
+        document.getElementById('c-contact').value = c.contact || '';
+        document.getElementById('c-balance').value = c.balance || 0;
+        document.getElementById('c-type-select').value = c.type;
+    } else {
+        document.getElementById('client-form').reset();
+        document.getElementById('c-type-select').value = type;
+        document.getElementById('c-balance').value = 0;
+    }
+    modal.classList.add('open');
+}
+
+async function saveClient(e) {
+    e.preventDefault();
+    showLoading();
+    try {
+        const id = document.getElementById('client-id').value;
+        const name = document.getElementById('c-name').value.trim();
+        const nit = document.getElementById('c-nit').value.trim();
+        const contact = document.getElementById('c-contact').value.trim();
+        const balance = parseFloat(document.getElementById('c-balance').value) || 0;
+        const type = document.getElementById('c-type-select').value;
+        if (!name) {
+            toast('Nombre requerido', 'error');
+            hideLoading();
+            return;
+        }
+        const data = { name, nit, contact, balance, type };
+        if (id) {
+            await db.clients.update(parseInt(id), data);
+            toast('Actualizado', 'success');
+        } else {
+            await db.clients.add(data);
+            toast('Creado', 'success');
+        }
+        closeModal('client-modal');
+        loadCRM();
+        loadClientsSelect();
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function deleteClient(id) {
+    if (!confirm('¿Eliminar?')) return;
+    await db.clients.delete(id);
+    toast('Eliminado', 'success');
+    loadCRM();
+    loadClientsSelect();
+}
+
+async function registerPayment(clientId) {
+    const amount = prompt('Monto del pago (CUP):');
+    if (amount && !isNaN(amount) && parseFloat(amount) > 0) {
+        const client = await db.clients.get(clientId);
+        if (!client) return toast('Cliente no encontrado', 'error');
+        const newBalance = (client.balance || 0) - parseFloat(amount);
+        await db.clients.update(clientId, { balance: newBalance });
+        await db.movements.add({
+            date: new Date().toISOString(),
+            type: 'ingreso',
+            amount: parseFloat(amount),
+            category: 'Ventas',
+            description: `Pago de cliente ${client.name}`
+        });
+        toast('Pago registrado', 'success');
+        loadCRM();
+        loadFinances();
+    }
+}
+
+// ======================================================================
+// 12. RRHH
+// ======================================================================
+async function loadHR() {
+    const employees = await db.employees.toArray();
+    const container = document.getElementById('hr-list');
+    container.innerHTML = '';
+    if (employees.length === 0) return container.textContent = 'Sin empleados.';
+    for (const e of employees) {
+        const div = document.createElement('div');
+        div.style.padding = '10px';
+        div.style.borderBottom = '1px solid var(--border)';
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between;">
+                <span><strong>${e.name}</strong> - ${e.role} - Salario: ${e.salary} CUP - Comisión: ${e.commission}%</span>
+                <div>
+                    <button class="btn btn-sm" onclick="openEmployeeModal(${e.id})"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteEmployee(${e.id})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+}
+
+async function openEmployeeModal(id = null) {
+    const modal = document.getElementById('employee-modal');
+    document.getElementById('employee-id').value = id || '';
+    if (id) {
+        const e = await db.employees.get(id);
+        if (!e) return toast('No encontrado', 'error');
+        document.getElementById('e-name').value = e.name;
+        document.getElementById('e-role').value = e.role || 'Vendedor';
+        document.getElementById('e-salary').value = e.salary || 0;
+        document.getElementById('e-commission').value = e.commission || 0;
+    } else {
+        document.getElementById('employee-form').reset();
+        document.getElementById('e-role').value = 'Vendedor';
+        document.getElementById('e-salary').value = 0;
+        document.getElementById('e-commission').value = 0;
+    }
+    modal.classList.add('open');
+}
+
+async function saveEmployee(e) {
+    e.preventDefault();
+    showLoading();
+    try {
+        const id = document.getElementById('employee-id').value;
+        const name = document.getElementById('e-name').value.trim();
+        const role = document.getElementById('e-role').value.trim();
+        const salary = parseFloat(document.getElementById('e-salary').value) || 0;
+        const commission = parseFloat(document.getElementById('e-commission').value) || 0;
+        if (!name) {
+            toast('Nombre requerido', 'error');
+            hideLoading();
+            return;
+        }
+        const data = { name, role, salary, commission };
+        if (id) {
+            await db.employees.update(parseInt(id), data);
+            toast('Actualizado', 'success');
+        } else {
+            await db.employees.add(data);
+            toast('Creado', 'success');
+        }
+        closeModal('employee-modal');
+        loadHR();
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function deleteEmployee(id) {
+    if (!confirm('¿Eliminar empleado?')) return;
+    await db.employees.delete(id);
+    toast('Eliminado', 'success');
+    loadHR();
+}
+
+async function registerAttendance() {
+    const employees = await db.employees.toArray();
+    if (employees.length === 0) return toast('No hay empleados', 'error');
+    const list = employees.map((e, i) => `${i+1}. ${e.name}`).join('\n');
+    const choice = prompt(`Seleccione empleado:\n${list}\nNúmero:`);
+    if (!choice) return;
+    const idx = parseInt(choice) - 1;
+    if (idx < 0 || idx >= employees.length) return toast('Selección inválida', 'error');
+    const emp = employees[idx];
+    const type = prompt('Tipo (entrada/salida):') || 'entrada';
+    await db.attendance.add({
+        employeeId: emp.id,
+        date: new Date().toISOString(),
+        type: type,
+        lat: null,
+        lng: null
+    });
+    toast(`Asistencia registrada: ${emp.name} - ${type}`, 'success');
+    loadAttendance();
+}
+
+async function loadAttendance() {
+    const attendance = await db.attendance.toArray();
+    const container = document.getElementById('attendance-list');
+    container.innerHTML = '';
+    if (attendance.length === 0) return container.textContent = 'Sin registros.';
+    for (const a of attendance.slice(-10).reverse()) {
+        const emp = await db.employees.get(a.employeeId);
+        const div = document.createElement('div');
+        div.style.padding = '5px 0';
+        div.style.borderBottom = '1px solid var(--border)';
+        div.textContent = `${emp ? emp.name : 'Desconocido'} - ${a.type} - ${new Date(a.date).toLocaleString()}`;
+        container.appendChild(div);
+    }
+}
+
+async function calculatePayroll() {
+    const employees = await db.employees.toArray();
+    let result = '';
+    let totalPayroll = 0;
+    for (const e of employees) {
+        const salary = e.salary || 0;
+        const sales = await db.sales.where('date').startsWith(new Date().toISOString().slice(0,7)).toArray();
+        const totalSales = sales.reduce((s, sale) => s + sale.total, 0);
+        const commission = totalSales * (e.commission / 100);
+        const total = salary + commission;
+        totalPayroll += total;
+        result += `${e.name}: Salario ${salary} + Comisión ${commission.toFixed(2)} = ${total.toFixed(2)} CUP\n`;
+    }
+    result += `\nTotal Nómina: ${totalPayroll.toFixed(2)} CUP`;
+    document.getElementById('payroll-result').textContent = result;
+    toast('Nómina calculada', 'success');
+}
+
+// ======================================================================
+// 13. CONFIGURACIÓN
+// ======================================================================
+async function loadSettings() {
+    const settings = await db.settings.toArray();
+    if (settings.length) {
+        const s = settings[0];
+        document.getElementById('company-name').value = s.companyName || '';
+        document.getElementById('company-nit').value = s.nit || '';
+        document.getElementById('company-address').value = s.address || '';
+        document.getElementById('tax-regime').value = s.taxRegime || 'general';
+        document.getElementById('exchange-rate').value = s.exchangeRate || 24;
+    }
+}
+
+async function saveSettings() {
+    const data = {
+        companyName: document.getElementById('company-name').value.trim(),
+        nit: document.getElementById('company-nit').value.trim(),
+        address: document.getElementById('company-address').value.trim(),
+        taxRegime: document.getElementById('tax-regime').value,
+        exchangeRate: parseFloat(document.getElementById('exchange-rate').value) || 24
+    };
+    const existing = await db.settings.toArray();
+    if (existing.length) {
+        await db.settings.update(existing[0].id, data);
+    } else {
+        await db.settings.add(data);
+    }
+    toast('Configuración guardada', 'success');
+}
+
+// ======================================================================
+// 14. RESPALDO Y REINICIO
+// ======================================================================
+async function exportBackup() {
+    const data = {
+        products: await db.products.toArray(),
+        lots: await db.lots.toArray(),
+        recipes: await db.recipes.toArray(),
+        recipeItems: await db.recipeItems.toArray(),
+        sales: await db.sales.toArray(),
+        saleItems: await db.saleItems.toArray(),
+        purchases: await db.purchases.toArray(),
+        purchaseItems: await db.purchaseItems.toArray(),
+        movements: await db.movements.toArray(),
+        clients: await db.clients.toArray(),
+        invoices: await db.invoices.toArray(),
+        orders: await db.orders.toArray(),
+        employees: await db.employees.toArray(),
+        attendance: await db.attendance.toArray(),
+        settings: await db.settings.toArray()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Respaldo descargado', 'success');
+}
+
+function importBackupFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            showLoading();
+            await db.transaction('rw', db.tables.map(t => t.name), async () => {
+                for (const table of db.tables) {
+                    await table.clear();
+                }
+                for (const key of Object.keys(data)) {
+                    if (data[key].length) {
+                        await db[key].bulkAdd(data[key]);
+                    }
+                }
+            });
+            toast('Respaldo restaurado', 'success');
+            location.reload();
+        } catch (err) {
+            toast('Error al restaurar: ' + err.message, 'error');
+        } finally {
+            hideLoading();
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+async function resetDB() {
+    if (!confirm('¿Reiniciar TODOS los datos? Esta acción es irreversible.')) return;
+    showLoading();
+    try {
+        await db.transaction('rw', db.tables.map(t => t.name), async () => {
+            for (const table of db.tables) {
+                await table.clear();
+            }
+        });
+        toast('Datos reiniciados', 'success');
+        location.reload();
+    } catch (err) {
+        toast('Error: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// ======================================================================
+// 15. PWA: SERVICE WORKER + INSTALACIÓN
+// ======================================================================
+let deferredPrompt = null;
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
         .then(reg => {
-          console.log('SW registrado', reg);
-          document.getElementById('debug').textContent = '✅ Service Worker registrado';
+            console.log('✅ SW registrado', reg);
+            document.getElementById('install-status').innerHTML = '<i class="fas fa-check-circle" style="color:green;"></i> SW listo';
         })
         .catch(err => {
-          console.error('Error SW', err);
-          document.getElementById('debug').textContent = '❌ Error SW: ' + err.message;
+            console.error('❌ Error SW:', err);
+            document.getElementById('install-status').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:orange;"></i> SW falló';
         });
-    } else {
-      document.getElementById('debug').textContent = '⚠️ Service Worker no soportado';
-    }
+} else {
+    document.getElementById('install-status').textContent = '⚠️ No soportado';
+}
 
-    // Evento beforeinstallprompt
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      document.getElementById('status').textContent = '✅ Puedes instalar esta app';
-      document.getElementById('debug').textContent += ' | Prompt listo';
-    });
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-status').innerHTML = '<i class="fas fa-download" style="color:#0d47a1;"></i> Instalar disponible';
+});
 
-    // Botón de instalación
-    document.getElementById('installBtn').addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        document.getElementById('status').textContent = outcome === 'accepted' ? '🎉 Instalada' : '❌ Cancelada';
-        deferredPrompt = null;
-      } else {
-        alert('Asegúrate de que el Service Worker esté registrado y la página esté en HTTPS.');
-      }
-    });
+if (window.matchMedia('(display-mode: standalone)').matches) {
+    document.getElementById('install-status').innerHTML = '<i class="fas fa-check-circle" style="color:green;"></i> Instalada';
+}
 
-    // Si ya está instalada
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      document.getElementById('status').textContent = '📱 App ya instalada';
-    }
-  </script>
+// ======================================================================
+// 16. INICIALIZACIÓN
+// ======================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const theme = localStorage.getItem('theme') || 'light';
+    document.body.setAttribute('data-theme', theme);
+    document.getElementById('theme-icon').className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    switchView('dashboard');
+    loadClientsSelect();
+    loadAttendance();
+});
+</script>
 </body>
 </html>
