@@ -3,80 +3,69 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi PWA</title>
-  <link rel="manifest" href="manifest.json">
+  <title>Mi PWA en GitHub Pages</title>
+  <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#317EFB">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 2rem;
-      background: #f0f4f8;
-      color: #1a202c;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 2rem; background: #f0f4f8; color: #1a202c; }
     h1 { color: #2b6cb0; }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      max-width: 400px;
-      margin: 2rem auto;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    button {
-      background: #2b6cb0;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
+    .card { background: white; border-radius: 12px; padding: 2rem; max-width: 400px; margin: 2rem auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    button { background: #2b6cb0; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem; cursor: pointer; }
     button:hover { background: #1a4f8b; }
     .status { margin-top: 1rem; color: #38a169; }
+    .debug { font-size: 0.8rem; color: #718096; }
   </style>
 </head>
 <body>
-  <h1>🚀 Mi Aplicación Instalable</h1>
+  <h1>🚀 App Instalable</h1>
   <div class="card">
     <p>Esta app se puede instalar desde Chrome.</p>
-    <p>Busca el icono de instalar en la barra de direcciones.</p>
-    <button id="notifyBtn">¡Haz clic!</button>
+    <button id="installBtn">Instalar App</button>
     <p id="status" class="status"></p>
+    <p id="debug" class="debug"></p>
   </div>
 
   <script>
-    // Registro del Service Worker
+    // Registro del Service Worker con ruta relativa
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(reg => console.log('SW registrado correctamente', reg))
-        .catch(err => console.error('Error al registrar SW', err));
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+          console.log('SW registrado', reg);
+          document.getElementById('debug').textContent = '✅ Service Worker registrado';
+        })
+        .catch(err => {
+          console.error('Error SW', err);
+          document.getElementById('debug').textContent = '❌ Error SW: ' + err.message;
+        });
+    } else {
+      document.getElementById('debug').textContent = '⚠️ Service Worker no soportado';
     }
 
-    // Evento de instalación (beforeinstallprompt)
+    // Evento beforeinstallprompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
       document.getElementById('status').textContent = '✅ Puedes instalar esta app';
+      document.getElementById('debug').textContent += ' | Prompt listo';
     });
 
-    // Botón de notificación
-    document.getElementById('notifyBtn').addEventListener('click', () => {
+    // Botón de instalación
+    document.getElementById('installBtn').addEventListener('click', async () => {
       if (deferredPrompt) {
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(choice => {
-          if (choice.outcome === 'accepted') {
-            document.getElementById('status').textContent = '🎉 App instalada con éxito';
-          } else {
-            document.getElementById('status').textContent = '❌ Instalación cancelada';
-          }
-          deferredPrompt = null;
-        });
+        const { outcome } = await deferredPrompt.userChoice;
+        document.getElementById('status').textContent = outcome === 'accepted' ? '🎉 Instalada' : '❌ Cancelada';
+        deferredPrompt = null;
       } else {
-        alert('¡Hola! Esta app se puede instalar desde Chrome.');
+        alert('Asegúrate de que el Service Worker esté registrado y la página esté en HTTPS.');
       }
     });
+
+    // Si ya está instalada
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      document.getElementById('status').textContent = '📱 App ya instalada';
+    }
   </script>
 </body>
 </html>
