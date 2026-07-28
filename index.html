@@ -43,7 +43,11 @@
             --shadow: 0 4px 12px rgba(0,0,0,0.6);
         }
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,sans-serif; }
-        body { background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+        body { background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s;
+          overscroll-behavior: none;
+          /* También evita el rebote en iOS */
+          -webkit-overflow-scrolling: auto;
+        }
         .app { max-width:1200px; margin:0 auto; display:flex; min-height:100vh; }
         #sidebar {
             width:260px; background:var(--primary-dark); color:#fff; display:flex; flex-direction:column;
@@ -2113,6 +2117,13 @@ async function resetDB() {
         hideLoading();
     }
 }
+
+document.addEventListener('touchmove', function(event) {
+    // Si el scroll está en la parte superior y se desliza hacia abajo, prevenir
+    if (window.scrollY === 0 && event.touches[0].clientY > 0) {
+        event.preventDefault();
+    }
+}, { passive: false });
 
 // ======================================================================
 // 15. PWA: SERVICE WORKER + INSTALACIÓN
