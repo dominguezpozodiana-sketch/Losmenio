@@ -1,38 +1,34 @@
-const CACHE_NAME = 'todo-app-v1';
-const ASSETS = [
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json'
+const CACHE_NAME = 'mi-lista-v1';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[SW] Cacheando archivos');
-        return cache.addAll(ASSETS);
-      })
+      .then(cache => cache.addAll(urlsToCache))
       .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', event => {
-  console.log('[SW] Activado');
   event.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+        cacheNames.filter(name => name !== CACHE_NAME)
+          .map(name => caches.delete(name))
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
-      .then(response => response || fetch(event.request))
+      .then(response => {
+        return response || fetch(event.request);
+      })
   );
 });
